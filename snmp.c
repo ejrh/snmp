@@ -285,7 +285,7 @@ int snmp_get_pdu_type(SNMPMessage *message)
 
 int snmp_get_varbind(SNMPMessage *message, int num, char **oid, char **value)
 {
-    int i;
+    int i = 0;
     VarbindList *vb = message->varbind_list;
     
     while (vb && i >= 0)
