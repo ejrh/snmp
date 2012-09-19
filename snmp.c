@@ -288,7 +288,7 @@ int snmp_get_varbind(SNMPMessage *message, int num, char **oid, char **value)
     int i = 0;
     VarbindList *vb = message->varbind_list;
     
-    while (vb && i >= 0)
+    while (vb)
     {
         if (i == num)
         {
@@ -302,7 +302,7 @@ int snmp_get_varbind(SNMPMessage *message, int num, char **oid, char **value)
         }
         
         vb = vb->next;
-        i--;
+        i++;
     }
     
     return 0;
