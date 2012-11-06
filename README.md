@@ -41,11 +41,11 @@ Configuration file
 The configuration file is a plain text file, with fields separated by white
 space.  Each line is of the form:
 
-    hostname   oid    frequency
+    hostname[:port]    oid    frequency
 
-Hostname is a host name or address.  OID is an OID in numeric form.  Frequency
-is a positive value and represents the delay in seconds between successive
-requests for that OID from that host.
+Hostname is a host name or address; port is optional and defaults to 161.
+OID is an OID in numeric form.  Frequency is a positive value and represents
+the delay in seconds between successive requests for that OID from that host.
 
 Text after the # character is treated as a comment, and blank lines are
 ignored.

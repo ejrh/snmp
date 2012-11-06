@@ -21,8 +21,6 @@ typedef struct Options
 {
     int verbose;
     int listen_port;
-    char *agent_host;
-    int agent_port;
     char *config_filename;
     Config *config;
 } Options;
@@ -52,22 +50,6 @@ static void parse_args(int argc, char *argv[], Options *options)
     if (options->listen_port < 1 || options->listen_port > 65535)
     {
         fprintf(stderr, "Listen port must be between 1 and 65535\n");
-        exit(1);
-    }
-    
-    if (optind >= argc)
-    {
-        fprintf(stderr, "Need an agent host\n");
-        exit(1);
-    }
-    else if (!split_host_port(argv[optind], DEFAULT_AGENT_PORT, &options->agent_host, &options->agent_port))
-    {
-        fprintf(stderr, "Agent host cannot be parsed\n");
-        exit(1);
-    }
-    else if (options->agent_port < 1 || options->agent_port > 65535)
-    {
-        fprintf(stderr, "Agent port must be between 1 and 65535\n");
         exit(1);
     }
     
@@ -104,7 +86,7 @@ static void log_message(SNMPMessage *message, char *sender_host)
 
 static unsigned int next_request_id = 0;
 
-unsigned int send_request(Options *options, int socket, char *oid)
+unsigned int send_request(Options *options, int socket, char *agent_host, int agent_port, char *oid)
 {
     SNMPMessage *message;
     int len;
@@ -118,7 +100,7 @@ unsigned int send_request(Options *options, int socket, char *oid)
     snmp_set_request_id(message, request_id);
     snmp_set_error(message, 0);
     snmp_set_error_index(message, 0);
-    snmp_add_varbind_null(message, oid);;
+    snmp_add_varbind_null(message, oid);
     
     len = snmp_message_length(message);
     buf = malloc(len);
@@ -130,9 +112,9 @@ unsigned int send_request(Options *options, int socket, char *oid)
     snmp_destroy_message(message);
     
     if (options->verbose)
-        fprintf(stderr, "Sending datagram to %s:%d\n", options->agent_host, options->agent_port);
+        fprintf(stderr, "Sending datagram to %s:%d\n", agent_host, agent_port);
 
-    send_udp_datagram(buf, len, socket, options->agent_host, options->agent_port);
+    send_udp_datagram(buf, len, socket, agent_host, agent_port);
     
     free(buf);
     
@@ -149,7 +131,7 @@ static void check_requests(Options *options, int socket)
         
         if (item->wait <= 0)
         {
-            send_request(options, socket, item->oid);
+            send_request(options, socket, item->host_name, item->port, item->oid);
             item->wait = item->frequency;
         }
         
@@ -187,6 +169,31 @@ static void check_for_responses(Options *options, int socket)
     }
 }
 
+static void initialise_config(Config *config)
+{
+    ConfigItem *item = config->item_list;
+    
+    while (item != NULL)
+    {
+        if (!split_host_port(item->host, DEFAULT_AGENT_PORT, &item->host_name, &item->port))
+        {
+            fprintf(stderr, "Warning: Agent host cannot be parsed: %s\n", item->host);
+            item->port = 0;
+            continue;
+        }
+        else if (item->port < 1 || item->port > 65535)
+        {
+            fprintf(stderr, "Agent port must be between 1 and 65535: %s\n", item->host);
+            item->port = 0;
+            continue;
+        }
+        
+        item->wait = 0;
+        
+        item = item->next;
+    }
+}
+
 static void run(Options *options)
 {
     int socket = open_udp_socket(options->listen_port);
@@ -199,6 +206,7 @@ static void run(Options *options)
         if (options->config == NULL)
         {
             options->config = load_config(options->config_filename);
+            initialise_config(options->config);
             if (options->verbose)
             {
                 fprintf(stderr, "Loading config from %s\n", options->config_filename);
@@ -207,8 +215,8 @@ static void run(Options *options)
         }
         
         check_requests(options, socket);
-        check_for_responses(options, socket);
         sleep(1);
+        check_for_responses(options, socket);
     }
     
     close(socket);

@@ -32,6 +32,8 @@ static void load_line(char *line, Config *config)
     
     item = malloc(sizeof(ConfigItem));
     item->host = strdup(host);
+    item->host_name = NULL;
+    item->port = 0;
     item->oid = strdup(oid);
     item->frequency = freq;
     item->wait = freq;
@@ -73,7 +75,10 @@ void print_config(Config *config, FILE *stream)
     
     while (item != NULL)
     {
-        fprintf(stream, "    %s %s %d\n", item->host, item->oid, item->frequency);
+        if (item->port == 0)
+            fprintf(stream, "    %s %s %d\n", item->host, item->oid, item->frequency);
+        else
+            fprintf(stream, "    %s:%d %s %d\n", item->host, item->port, item->oid, item->frequency);
         item = item->next;
     }
 }
