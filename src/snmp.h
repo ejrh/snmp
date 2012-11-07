@@ -4,6 +4,8 @@
 #include <stdio.h>
 
 enum {
+    SNMP_TIMETICKS_TYPE = 0x43,
+    
     SNMP_GET_REQUEST_TYPE = 0xA0,
     SNMP_GET_RESPONSE_TYPE = 0xA2,
     SNMP_SET_REQUEST_TYPE = 0xA3
@@ -20,6 +22,7 @@ void snmp_set_request_id(SNMPMessage *message, int request_id);
 void snmp_set_error(SNMPMessage *message, int error);
 void snmp_set_error_index(SNMPMessage *message, int error_index);
 void snmp_add_varbind_null(SNMPMessage *message, char *oid);
+void snmp_add_varbind_integer_type(SNMPMessage *message, char *oid, int type, int value);
 void snmp_add_varbind_integer(SNMPMessage *message, char *oid, int value);
 void snmp_add_varbind_string(SNMPMessage *message, char *oid, char *value);
 int snmp_message_length(SNMPMessage *message);
