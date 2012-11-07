@@ -82,3 +82,22 @@ void print_config(Config *config, FILE *stream)
         item = item->next;
     }
 }
+
+void destroy_config(Config *config)
+{
+    ConfigItem *item = config->item_list;
+    
+    while (item != NULL)
+    {
+        ConfigItem *next_item = item->next;
+        
+        free(item->host);
+        free(item->host_name);
+        free(item->oid);
+        free(item);
+        
+        item = next_item;
+    }
+    
+    free(config);
+}

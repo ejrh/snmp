@@ -23,4 +23,6 @@ Config *load_config(const char *filename);
 
 void print_config(Config *config, FILE *stream);
 
+void destroy_config(Config *config);
+
 #endif

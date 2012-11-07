@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "net.h"
 #include "snmp.h"
@@ -194,6 +195,13 @@ static void initialise_config(Config *config)
     }
 }
 
+static volatile sig_atomic_t reload_config = 1;
+
+static void handle_sigquit(int signum)
+{
+    reload_config = 1;
+}
+
 static void run(Options *options)
 {
     int socket = open_udp_socket(options->listen_port);
@@ -201,17 +209,28 @@ static void run(Options *options)
     if (options->verbose)
         fprintf(stderr, "Opened socket on port %d\n", options->listen_port);
     
+    if (signal(SIGQUIT, handle_sigquit) == SIG_IGN)
+        signal(SIGQUIT, SIG_IGN);
+    
+    reload_config = 1;
+    
     while (1)
     {
-        if (options->config == NULL)
+        if (reload_config)
         {
+            if (options->config != NULL)
+                destroy_config(options->config);
+            
             options->config = load_config(options->config_filename);
             initialise_config(options->config);
+            
             if (options->verbose)
             {
-                fprintf(stderr, "Loading config from %s\n", options->config_filename);
+                fprintf(stderr, "Loaded config from %s\n", options->config_filename);
                 print_config(options->config, stderr);
             }
+            
+            reload_config = 0;
         }
         
         check_requests(options, socket);
