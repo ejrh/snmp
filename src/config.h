@@ -19,6 +19,8 @@ typedef struct Config
     ConfigItem *item_list;
 } Config;
 
+Config *create_config(void);
+
 Config *load_config(const char *filename);
 
 void print_config(Config *config, FILE *stream);

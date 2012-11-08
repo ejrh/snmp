@@ -29,9 +29,16 @@ Command line
 
 Options include:
 
-    -v        verbose mode
+    -v            verbose mode
+    -p PORT       port to listen for replies on
+    -c FILENAME   config file to use
 
-The list of hosts and OIDs to poll is read from `sample.conf`.
+The list of hosts and OIDs to poll is read from the config file, which defaults
+to `poller.conf`.  If this file cannot be read, the poller will act as if an
+empty file is specified.
+
+The poller will reread the config file when it receives a SIGQUIT signal.
+
 
 Configuration file
 ------------------

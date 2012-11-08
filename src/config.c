@@ -42,6 +42,16 @@ static void load_line(char *line, Config *config)
     config->item_list = item;
 }
 
+Config *create_config(void)
+{
+    Config *config;
+    
+    config = malloc(sizeof(Config));
+    config->item_list = NULL;
+    
+    return config;
+}
+
 Config *load_config(const char *filename)
 {
     Config *config;

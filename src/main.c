@@ -16,7 +16,7 @@
 
 #define DEFAULT_AGENT_PORT 161
 
-#define DEFAULT_CONFIG_FILENAME "sample.conf"
+#define DEFAULT_CONFIG_FILENAME "poller.conf"
 
 typedef struct Options
 {
@@ -32,10 +32,11 @@ static void parse_args(int argc, char *argv[], Options *options)
     
     options->verbose = 0;
     options->listen_port = DEFAULT_LISTEN_PORT;
+    options->config_filename = DEFAULT_CONFIG_FILENAME;
 
     opterr = 1;
 
-    while ((c = getopt (argc, argv, "vp:")) != -1)
+    while ((c = getopt (argc, argv, "vp:c:")) != -1)
         switch (c)
         {
             case 'v':
@@ -43,6 +44,9 @@ static void parse_args(int argc, char *argv[], Options *options)
                 break;
             case 'p':
                 options->listen_port = strtol(optarg, NULL, 0);
+                break;
+            case 'c':
+                options->config_filename = optarg;
                 break;
             default:
                 exit(1);
@@ -54,7 +58,6 @@ static void parse_args(int argc, char *argv[], Options *options)
         exit(1);
     }
     
-    options->config_filename = DEFAULT_CONFIG_FILENAME;
     options->config = NULL;
 }
 
@@ -222,6 +225,11 @@ static void run(Options *options)
                 destroy_config(options->config);
             
             options->config = load_config(options->config_filename);
+            if (!options->config)
+            {
+                fprintf(stderr, "Warning: Config file cannot be read: %s\n", options->config_filename);
+                options->config = create_config();
+            }
             initialise_config(options->config);
             
             if (options->verbose)
