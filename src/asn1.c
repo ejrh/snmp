@@ -314,9 +314,9 @@ static void *read_oid(void *src, char **oid, int size)
     return src;
 }
 
-int value_length(int value_type, Value value)
+int value_length(int render_as_type, Value value)
 {
-    switch (value_type)
+    switch (render_as_type)
     {
         case ASN1_NULL_TYPE:
             return null_length();
@@ -329,9 +329,9 @@ int value_length(int value_type, Value value)
     }
 }
 
-char *render_value(int value_type, Value value, char *dest)
+char *render_value(int render_as_type, Value value, char *dest)
 {
-    switch (value_type)
+    switch (render_as_type)
     {
         case ASN1_NULL_TYPE:
             return render_null(dest);
@@ -344,12 +344,12 @@ char *render_value(int value_type, Value value, char *dest)
     }
 }
 
-char *render_value_object(int value_type, Value value, char *dest)
+char *render_value_object(int value_type, int render_as_type, Value value, char *dest)
 {
-    int data_len = value_length(value_type, value);
+    int data_len = value_length(render_as_type, value);
     dest = render_header(value_type, data_len, dest);
     
-    switch (value_type)
+    switch (render_as_type)
     {
         case ASN1_NULL_TYPE:
             return render_null(dest);
@@ -455,6 +455,18 @@ void asn1_destroy_parser(ASN1Parser *parser)
     free(parser);
 }
 
+int asn1_parse_peek(ASN1Parser *parser, int *type, int *len)
+{
+    if (parser->state->remaining == 0)
+        return 0;
+    
+    if (type)
+        *type = next_type(parser);
+    if (len)
+        *len = next_len(parser);
+    return 1;
+}
+
 int asn1_parse_sequence(ASN1Parser *parser)
 {
     int type;
@@ -468,7 +480,9 @@ int asn1_parse_structure(ASN1Parser *parser, int *type)
     int t = next_type(parser);
     if (!(t & 0x20))
         return 0;
-    *type = t;
+    
+    if (type)
+        *type = t;
     
     int len = next_len(parser);
     void *payload = next_payload(parser);
@@ -479,15 +493,16 @@ int asn1_parse_structure(ASN1Parser *parser, int *type)
     return 1;
 }
 
-int asn1_parse_integer(ASN1Parser *parser, int *dest)
+int asn1_parse_integer_type(ASN1Parser *parser, int *type, int *dest)
 {
     int size;
     void *payload;
     int i;
     int val;
     
-    if (next_type(parser) != ASN1_INTEGER_TYPE)
-        return 0;
+    if (type)
+        *type = next_type(parser);
+    
     size = next_len(parser);
     payload = next_payload(parser);
     
@@ -504,14 +519,23 @@ int asn1_parse_integer(ASN1Parser *parser, int *dest)
     return 1;
 }
 
-int asn1_parse_string(ASN1Parser *parser, char **dest)
+int asn1_parse_integer(ASN1Parser *parser, int *dest)
+{
+    if (next_type(parser) != ASN1_INTEGER_TYPE)
+        return 0;
+    
+    return asn1_parse_integer_type(parser, NULL, dest);
+}
+
+int asn1_parse_string_type(ASN1Parser *parser, int *type, char **dest)
 {
     int size;
     void *payload;
     int i;
+
+    if (type)
+        *type = next_type(parser);
     
-    if (next_type(parser) != ASN1_STRING_TYPE)
-        return 0;
     size = next_len(parser);
     payload = next_payload(parser);
     
@@ -527,6 +551,13 @@ int asn1_parse_string(ASN1Parser *parser, char **dest)
     
     consume(parser);
     return 1;
+}
+
+int asn1_parse_string(ASN1Parser *parser, char **dest)
+{
+    if (next_type(parser) != ASN1_STRING_TYPE)
+        return 0;
+    return asn1_parse_string_type(parser, NULL, dest);
 }
 
 int asn1_parse_oid(ASN1Parser *parser, char **dest)
@@ -545,11 +576,14 @@ int asn1_parse_oid(ASN1Parser *parser, char **dest)
     return 1;
 }
 
-int asn1_parse_value(ASN1Parser *parser, int *type, Value *value)
+int asn1_parse_primitive_value(ASN1Parser *parser, int *type, Value *value)
 {
-    *type = next_type(parser);
+    int the_type = next_type(parser);
     
-    switch (*type)
+    if (type)
+        *type = the_type;
+    
+    switch (the_type)
     {
         case ASN1_NULL_TYPE:
             consume(parser);

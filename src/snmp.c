@@ -12,6 +12,10 @@ typedef struct VarbindList
 {
     char *oid;
     int value_type;
+    
+    /** Will be a primtive ASN.1 type; effects how value will be interpreted. */
+    int render_as_type;
+    
     Value value;
     
     struct VarbindList *next;
@@ -47,7 +51,7 @@ static void destroy_varbind_list(VarbindList *list)
         return;
     
     free(list->oid);
-    if (list->value_type == ASN1_STRING_TYPE)
+    if (list->render_as_type == ASN1_STRING_TYPE)
         free(list->value.str_value);
     destroy_varbind_list(list->next);
     free(list);
@@ -110,7 +114,19 @@ void snmp_add_varbind_null(SNMPMessage *message, char *oid)
     VarbindList *vb = malloc(sizeof (VarbindList));
     vb->oid = strdup(oid);
     vb->value_type = ASN1_NULL_TYPE;
-    vb->value.str_value = NULL;
+    vb->render_as_type = ASN1_NULL_TYPE;
+    vb->next = NULL;
+    
+    snmp_add_varbind(message, vb);
+}
+
+void snmp_add_varbind_integer_type(SNMPMessage *message, char *oid, int type, int value)
+{
+    VarbindList *vb = malloc(sizeof (VarbindList));
+    vb->oid = strdup(oid);
+    vb->value_type = type;
+    vb->render_as_type = ASN1_INTEGER_TYPE;
+    vb->value.int_value = value;
     vb->next = NULL;
     
     snmp_add_varbind(message, vb);
@@ -118,13 +134,7 @@ void snmp_add_varbind_null(SNMPMessage *message, char *oid)
 
 void snmp_add_varbind_integer(SNMPMessage *message, char *oid, int value)
 {
-    VarbindList *vb = malloc(sizeof (VarbindList));
-    vb->oid = strdup(oid);
-    vb->value_type = ASN1_INTEGER_TYPE;
-    vb->value.int_value = value;
-    vb->next = NULL;
-    
-    snmp_add_varbind(message, vb);
+    snmp_add_varbind_integer_type(message, oid, ASN1_INTEGER_TYPE, value);
 }
 
 void snmp_add_varbind_string(SNMPMessage *message, char *oid, char *value)
@@ -132,6 +142,7 @@ void snmp_add_varbind_string(SNMPMessage *message, char *oid, char *value)
     VarbindList *vb = malloc(sizeof (VarbindList));
     vb->oid = strdup(oid);
     vb->value_type = ASN1_STRING_TYPE;
+    vb->render_as_type = ASN1_STRING_TYPE;
     vb->value.str_value = strdup(value);
     vb->next = NULL;
     
@@ -145,7 +156,7 @@ static void get_msg_lens(SNMPMessage *message, int *msg_len, int *pdu_len, int *
     while (vb != NULL)
     {
         int oid_obj_len = object_length(oid_length(vb->oid));
-        int value_obj_len = object_length(value_length(vb->value_type, vb->value));
+        int value_obj_len = object_length(value_length(vb->render_as_type, vb->value));
         *vbl_len += object_length(oid_obj_len + value_obj_len);
         
         vb = vb->next;
@@ -193,10 +204,10 @@ void snmp_render_message(SNMPMessage *message, void *buffer)
     while (vb != NULL)
     {
         int oid_obj_len = object_length(oid_length(vb->oid));
-        int value_obj_len = object_length(value_length(vb->value_type, vb->value));
+        int value_obj_len = object_length(value_length(vb->render_as_type, vb->value));
         p = render_sequence_header(oid_obj_len + value_obj_len, p);
         p = render_oid_object(vb->oid, p);
-        p = render_value_object(vb->value_type, vb->value, p);
+        p = render_value_object(vb->value_type, vb->render_as_type, vb->value, p);
         
         vb = vb->next;
     }
@@ -221,22 +232,29 @@ SNMPMessage *snmp_parse_message(void *buffer, int len)
         int type;
         Value value;
         asn1_parse_oid(parser, &oid);
-        asn1_parse_value(parser, &type, &value);
-        asn1_parse_pop(parser);
+        asn1_parse_peek(parser, &type, NULL);
         
         switch (type)
         {
             case ASN1_NULL_TYPE:
+                asn1_parse_primitive_value(parser, NULL, &value);
                 snmp_add_varbind_null(message, oid);
                 break;
+
+            case SNMP_TIMETICKS_TYPE:
             case ASN1_INTEGER_TYPE:
-                snmp_add_varbind_integer(message, oid, value.int_value);
+                asn1_parse_integer_type(parser, NULL, &value.int_value);
+                snmp_add_varbind_integer_type(message, oid, type, value.int_value);
                 break;
+            
             case ASN1_STRING_TYPE:
+                asn1_parse_string_type(parser, NULL, &value.str_value);
                 snmp_add_varbind_string(message, oid, value.str_value);
                 free(value.str_value);
                 break;
         }
+        
+        asn1_parse_pop(parser);
     }
     asn1_parse_pop(parser);
     asn1_parse_pop(parser);
@@ -261,18 +279,24 @@ void snmp_print_message(SNMPMessage *message, FILE *stream)
     vb = message->varbind_list;
     while (vb)
     {
+        char type_str[20] = "";
+        if (vb->value_type != vb->render_as_type)
+            snprintf(type_str, sizeof(type_str), " (type 0x%02x)", vb->value_type);
+        
         fprintf(stream, "        OID: %s\n", vb->oid);
-        switch (vb->value_type)
+        switch (vb->render_as_type)
         {
             case ASN1_NULL_TYPE:
-                fprintf(stream, "            Null\n");
+                fprintf(stream, "            Null%s\n", type_str);
                 break;
             case ASN1_INTEGER_TYPE:
-                fprintf(stream, "            Integer: %d\n", vb->value.int_value);
+                fprintf(stream, "            Integer%s: %d\n", type_str, vb->value.int_value);
                 break;
             case ASN1_STRING_TYPE:
-                fprintf(stream, "            String: %s\n", vb->value.str_value);
+                fprintf(stream, "            String%s: %s\n", type_str, vb->value.str_value);
                 break;
+            default:
+                abort();
         }
         vb = vb->next;
     }
@@ -324,6 +348,7 @@ void test()
     snmp_set_error(message, 0);
     snmp_set_error_index(message, 0);
     snmp_add_varbind_null(message, "1.3.6.1.4.1.2680.1.2.7.3.2.0");
+    snmp_add_varbind_integer_type(message, "1.3.6.1.4.1.2680.1.2.7.3.2.0", SNMP_TIMETICKS_TYPE, 42);
     
     snmp_print_message(message, stdout);
     
