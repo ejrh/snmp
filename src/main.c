@@ -78,7 +78,7 @@ static void log_message(SNMPMessage *message, char *sender_host)
     
     get_time_str(timestamp_str, sizeof(timestamp_str));
     
-    while (snmp_get_varbind(message, i, &oid_str, &value_str))
+    while (snmp_get_varbind_as_string(message, i, &oid_str, NULL, &value_str))
     {
         printf("%s\t%s\t%s\t%s\n", host_str, timestamp_str, oid_str, value_str);
         i++;

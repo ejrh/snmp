@@ -31,6 +31,9 @@ SNMPMessage *snmp_parse_message(void *buffer, int len);
 void snmp_print_message(SNMPMessage *message, FILE *stream);
 
 int snmp_get_pdu_type(SNMPMessage *message);
-int snmp_get_varbind(SNMPMessage *message, int num, char **oid, char **value);
+
+int snmp_get_varbind_integer(SNMPMessage *message, int num, char **oid, int *type, int *int_value);
+int snmp_get_varbind_string(SNMPMessage *message, int num, char **oid, int *type, char **str_value);
+int snmp_get_varbind_as_string(SNMPMessage *message, int num, char **oid, int *type, char **value_str);
 
 #endif

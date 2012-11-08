@@ -307,7 +307,7 @@ int snmp_get_pdu_type(SNMPMessage *message)
     return message->pdu_type;
 }
 
-int snmp_get_varbind(SNMPMessage *message, int num, char **oid, char **value)
+static VarbindList *get_varbind(SNMPMessage *message, int num)
 {
     int i = 0;
     VarbindList *vb = message->varbind_list;
@@ -315,23 +315,104 @@ int snmp_get_varbind(SNMPMessage *message, int num, char **oid, char **value)
     while (vb)
     {
         if (i == num)
-        {
-            if (oid)
-                *oid = vb->oid;
-            
-            if (value)
-                *value = vb->value.str_value;
-            
-            return 1;
-        }
+            return vb;
         
         vb = vb->next;
         i++;
     }
     
-    return 0;
+    return NULL;
 }
 
+static int get_varbind_value(SNMPMessage *message, int num, char **oid, int *type, int *render_as_type, Value *value)
+{
+    VarbindList *vb = get_varbind(message, num);
+    if (!vb)
+        return 0;
+    
+    if (oid)
+        *oid = vb->oid;
+    
+    if (type)
+        *type = vb->value_type;
+    
+    if (render_as_type)
+        *render_as_type = vb->render_as_type;
+    
+    if (value)
+        *value = vb->value;
+    
+    return 1;
+}
+
+int snmp_get_varbind_integer(SNMPMessage *message, int num, char **oid, int *type, int *int_value)
+{
+    int render_as_type;
+    Value value;
+    
+    if (!get_varbind_value(message, num, oid, type, &render_as_type, &value))
+        return 0;
+    
+    //TODO return value of 0 also indicates end of list
+    //handle non-integer data differently?
+    if (render_as_type != ASN1_INTEGER_TYPE)
+        return 0;
+
+    if (int_value)
+        *int_value = value.int_value;
+    
+    return 1;
+}
+
+int snmp_get_varbind_string(SNMPMessage *message, int num, char **oid, int *type, char **str_value)
+{
+    int render_as_type;
+    Value value;
+    
+    if (!get_varbind_value(message, num, oid, type, &render_as_type, &value))
+        return 0;
+    
+    //TODO return value of 0 also indicates end of list
+    //handle non-string data differently?
+    if (render_as_type != ASN1_STRING_TYPE)
+        return 0;
+
+    if (str_value)
+        *str_value = value.str_value;
+    
+    return 1;
+}
+
+int snmp_get_varbind_as_string(SNMPMessage *message, int num, char **oid, int *type, char **value_str)
+{
+    int render_as_type;
+    Value value;
+    char buf[20];
+    
+    if (!get_varbind_value(message, num, oid, type, &render_as_type, &value))
+        return 0;
+
+    if (!value_str)
+        return 1;
+    
+    switch (render_as_type)
+    {
+        case ASN1_NULL_TYPE:
+            *value_str = strdup("");
+            break;
+        case ASN1_INTEGER_TYPE:
+            snprintf(buf, sizeof(buf), "%d\n", value.int_value);
+            *value_str = strdup(buf);
+            break;
+        case ASN1_STRING_TYPE:
+            *value_str = strdup(value.str_value);
+            break;
+        default:
+            abort();
+    }
+    
+    return 1;
+}
 
 void test()
 {
