@@ -13,7 +13,9 @@ Upcoming features
 
   * Support for a greater variety of SNMP data types.
 
-  * Log to database (initially SQLite).
+  * Log to database (initially SQLite).  See branch `sqlite_logging`.
+
+  * Specify a range of OIDs.  This will require interating over the range in several request/response cycles.
 
 Performance ideas
 -----------------
