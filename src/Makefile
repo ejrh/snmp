@@ -1,4 +1,4 @@
-CFLAGS = -g -Wall
+CFLAGS = -g -Wall -lsqlite3
 
 OBJ=$(patsubst %.c, %.o, $(wildcard *.c))
 HEADERS=snmp.h asn1.h config.h net.h

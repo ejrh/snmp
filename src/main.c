@@ -9,6 +9,7 @@
 #include "net.h"
 #include "snmp.h"
 #include "config.h"
+#include "sqlite-logging.h"
 
 #define BUFLEN 65535
 
@@ -23,7 +24,10 @@ typedef struct Options
     int verbose;
     int listen_port;
     char *config_filename;
+    char *log_filename;
+    
     Config *config;
+    LogContext *log_context;
 } Options;
 
 static void parse_args(int argc, char *argv[], Options *options)
@@ -33,10 +37,11 @@ static void parse_args(int argc, char *argv[], Options *options)
     options->verbose = 0;
     options->listen_port = DEFAULT_LISTEN_PORT;
     options->config_filename = DEFAULT_CONFIG_FILENAME;
+    options->log_filename = NULL;
 
     opterr = 1;
 
-    while ((c = getopt (argc, argv, "vp:c:")) != -1)
+    while ((c = getopt (argc, argv, "vp:c:l:")) != -1)
         switch (c)
         {
             case 'v':
@@ -47,6 +52,9 @@ static void parse_args(int argc, char *argv[], Options *options)
                 break;
             case 'c':
                 options->config_filename = optarg;
+                break;
+            case 'l':
+                options->log_filename = optarg;
                 break;
             default:
                 exit(1);
@@ -59,6 +67,7 @@ static void parse_args(int argc, char *argv[], Options *options)
     }
     
     options->config = NULL;
+    options->log_context = NULL;
 }
 
 void get_time_str(char *buf, int size)
@@ -71,7 +80,7 @@ void get_time_str(char *buf, int size)
     strftime(buf, size, "%Y-%m-%d %H:%M:%S", &tm_buf);    
 }
 
-static void log_message(SNMPMessage *message, char *sender_host)
+static void log_message(Options *options, SNMPMessage *message, char *sender_host)
 {
     char *host_str = sender_host;
     char timestamp_str[20];
@@ -83,7 +92,11 @@ static void log_message(SNMPMessage *message, char *sender_host)
     
     while (snmp_get_varbind_as_string(message, i, &oid_str, NULL, &value_str))
     {
-        printf("%s\t%s\t%s\t%s\n", host_str, timestamp_str, oid_str, value_str);
+        if (options->log_context != NULL)
+            sqlite_log(options->log_context, host_str, timestamp_str, oid_str, value_str);
+        else
+            printf("%s\t%s\t%s\t%s\n", host_str, timestamp_str, oid_str, value_str);
+        
         i++;
     }
 }
@@ -167,7 +180,7 @@ static void check_for_responses(Options *options, int socket)
             snmp_print_message(message, stderr);
         
         if (snmp_get_pdu_type(message) == SNMP_GET_RESPONSE_TYPE)
-            log_message(message, sender_host);
+            log_message(options, message, sender_host);
         
         snmp_destroy_message(message);
     }
@@ -223,6 +236,8 @@ static void run(Options *options)
         {
             if (options->config != NULL)
                 destroy_config(options->config);
+            if (options->log_context != NULL)
+                destroy_sqlite_context(options->log_context);
             
             options->config = load_config(options->config_filename);
             if (!options->config)
@@ -236,6 +251,11 @@ static void run(Options *options)
             {
                 fprintf(stderr, "Loaded config from %s\n", options->config_filename);
                 print_config(options->config, stderr);
+            }
+            
+            if (options->log_filename != NULL)
+            {
+                options->log_context = create_sqlite_context(options->log_filename);
             }
             
             reload_config = 0;
