@@ -90,7 +90,7 @@ static void log_message(SNMPMessage *message, char *sender_host)
 
 static unsigned int next_request_id = 0;
 
-unsigned int send_request(Options *options, int socket, char *agent_host, int agent_port, char *oid)
+unsigned int send_request(Options *options, int socket, char *agent_host, int agent_port, char *oid, int walk_from)
 {
     SNMPMessage *message;
     int len;
@@ -100,7 +100,10 @@ unsigned int send_request(Options *options, int socket, char *agent_host, int ag
     message = snmp_create_message();
     snmp_set_version(message, 0);
     snmp_set_community(message, "public");
-    snmp_set_pdu_type(message, SNMP_GET_REQUEST_TYPE);
+    if (walk_from)
+        snmp_set_pdu_type(message, SNMP_GET_NEXT_REQUEST_TYPE);
+    else
+        snmp_set_pdu_type(message, SNMP_GET_REQUEST_TYPE);
     snmp_set_request_id(message, request_id);
     snmp_set_error(message, 0);
     snmp_set_error_index(message, 0);
@@ -135,12 +138,29 @@ static void check_requests(Options *options, int socket)
         
         if (item->wait <= 0)
         {
-            send_request(options, socket, item->host_name, item->port, item->oid);
+            send_request(options, socket, item->host_name, item->port, item->oid, item->wildcard);
             item->wait = item->frequency;
         }
         
         item = item->next;
     }
+}
+
+static int send_next_requests(Options *options, int socket, char *agent_host, int agent_port, SNMPMessage *message)
+{
+    int i = 0;
+    char *oid;
+    
+    if (options->verbose)
+        fprintf(stderr, "Sending next requests\n");
+    
+    while (snmp_get_varbind_as_string(message, i, &oid, NULL, NULL))
+    {
+        send_request(options, socket, agent_host, agent_port, oid, 1);
+        i++;
+    }
+    
+    return 1;
 }
 
 static void check_for_responses(Options *options, int socket)
@@ -168,6 +188,12 @@ static void check_for_responses(Options *options, int socket)
         
         if (snmp_get_pdu_type(message) == SNMP_GET_RESPONSE_TYPE)
             log_message(message, sender_host);
+    
+        //TODO only if it looks like the response to a wildcard request...
+        if (snmp_get_error(message) == 0)
+        {
+            send_next_requests(options, socket, sender_host, sender_port, message);
+        }
         
         snmp_destroy_message(message);
     }
