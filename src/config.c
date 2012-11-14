@@ -35,7 +35,7 @@ static void load_line(char *line, Config *config)
     item->host_name = NULL;
     item->port = 0;
     item->oid = strdup(oid);
-    p = strstr(".*", item->oid);
+    p = strstr(item->oid, ".*");
     if (p)
     {
         *p = '\0';
