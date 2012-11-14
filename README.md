@@ -21,6 +21,10 @@ The polling isn't especially efficient: no priority queues, and no batching
 of requests to the same host.  Additionally, host name and port are used each
 time a request is sent, rather than a cached `sockaddr` object.
 
+Range queries have some support, but the poller will only iterate one key at
+a time, will not stop when the end of the range is reached, and may
+allow overlapping queries for the same range at a time.
+
 
 Command line
 ------------
@@ -51,6 +55,9 @@ space.  Each line is of the form:
 Hostname is a host name or address; port is optional and defaults to 161.
 OID is an OID in numeric form.  Frequency is a positive value and represents
 the delay in seconds between successive requests for that OID from that host.
+
+If OID is of the form `a.*`, then the line specifies a range query.  All
+OIDs with the prefix `a.` will be queried for.
 
 Text after the `#` character is treated as a comment, and blank lines are
 ignored.
