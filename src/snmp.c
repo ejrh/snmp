@@ -307,6 +307,11 @@ int snmp_get_pdu_type(SNMPMessage *message)
     return message->pdu_type;
 }
 
+int snmp_get_error(SNMPMessage *message)
+{
+    return message->error;
+}
+
 static VarbindList *get_varbind(SNMPMessage *message, int num)
 {
     int i = 0;
