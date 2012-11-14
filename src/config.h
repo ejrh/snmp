@@ -8,6 +8,7 @@ typedef struct ConfigItem {
     char *host_name;
     int port;
     char *oid;
+    int wildcard;
     int frequency;
     int wait;
     

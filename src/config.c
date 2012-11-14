@@ -35,6 +35,15 @@ static void load_line(char *line, Config *config)
     item->host_name = NULL;
     item->port = 0;
     item->oid = strdup(oid);
+    p = strstr(".*", item->oid);
+    if (p)
+    {
+        *p = '\0';
+        item->wildcard = 1;
+    }
+    else
+        item->wildcard = 0;
+    
     item->frequency = freq;
     item->wait = freq;
     
@@ -85,10 +94,11 @@ void print_config(Config *config, FILE *stream)
     
     while (item != NULL)
     {
+        char *oid_suffix = item->wildcard ? ".*" : "";
         if (item->port == 0)
-            fprintf(stream, "    %s %s %d\n", item->host, item->oid, item->frequency);
+            fprintf(stream, "    %s %s%s %d\n", item->host, item->oid, oid_suffix, item->frequency);
         else
-            fprintf(stream, "    %s:%d %s %d\n", item->host, item->port, item->oid, item->frequency);
+            fprintf(stream, "    %s:%d%s %s %d\n", item->host, item->port, item->oid, oid_suffix, item->frequency);
         item = item->next;
     }
 }
