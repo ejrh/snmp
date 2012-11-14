@@ -4,7 +4,7 @@ Roadmap
 Proposed milestones
 -------------------
 
-  * 0.1 - Reliably poll a set of hosts and OIDs, and write the results to standard output.
+  * 0.1 - Reliably poll a set of hosts and OIDs, and write the results to standard output.  **[DONE]**
 
   * 1.0 - Efficiently poll hosts and OIDs, and optionally write results to a database.
 
