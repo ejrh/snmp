@@ -2,6 +2,7 @@
 #define CONFIG_H
 
 #include <stdio.h>
+#include <time.h>
 
 typedef struct ConfigItem {
     char *host;
@@ -9,7 +10,7 @@ typedef struct ConfigItem {
     int port;
     char *oid;
     int frequency;
-    int wait;
+    time_t next_time;
     
     struct ConfigItem *next;
 } ConfigItem;

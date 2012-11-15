@@ -127,16 +127,15 @@ unsigned int send_request(Options *options, int socket, char *agent_host, int ag
         
 static void check_requests(Options *options, int socket)
 {
+    time_t current_time = time(NULL);
     ConfigItem *item = options->config->item_list;
     
     while (item != NULL)
     {
-        item->wait--;
-        
-        if (item->wait <= 0)
+        if (item->next_time <= current_time)
         {
             send_request(options, socket, item->host_name, item->port, item->oid);
-            item->wait = item->frequency;
+            item->next_time = current_time + item->frequency;
         }
         
         item = item->next;
@@ -192,7 +191,7 @@ static void initialise_config(Config *config)
             continue;
         }
         
-        item->wait = 0;
+        item->next_time = 0;
         
         item = item->next;
     }
@@ -219,6 +218,8 @@ static void run(Options *options)
     
     while (1)
     {
+        int sleep_time;
+        
         if (reload_config)
         {
             if (options->config != NULL)
@@ -241,9 +242,11 @@ static void run(Options *options)
             reload_config = 0;
         }
         
-        check_requests(options, socket);
-        sleep(1);
+        //TODO how long until the next request goes out?
+        sleep_time = 1;
+        input_timeout(socket, sleep_time);
         check_for_responses(options, socket);
+        check_requests(options, socket);
     }
     
     close(socket);

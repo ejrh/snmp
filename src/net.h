@@ -44,4 +44,6 @@ void send_udp_datagram(void *buf, int len, int socket, char *target_host, int ta
  */
 int receive_udp_datagram(void *buf, int max, int socket, char **sender_host, int *sender_port);
 
+int input_timeout(int filedes, unsigned int seconds);
+
 #endif

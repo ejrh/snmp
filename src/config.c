@@ -36,7 +36,7 @@ static void load_line(char *line, Config *config)
     item->port = 0;
     item->oid = strdup(oid);
     item->frequency = freq;
-    item->wait = freq;
+    item->next_time = 0;
     
     item->next = config->item_list;
     config->item_list = item;

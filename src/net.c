@@ -9,6 +9,9 @@
 #include <netdb.h>
 #include <errno.h>
 
+#define __USE_GNU
+#include <unistd.h>
+
 #define BUFLEN 65535
 
 void diep(char *s)
@@ -98,4 +101,24 @@ int receive_udp_datagram(void *buf, int max, int socket, char **sender_host, int
         *sender_port = ntohs(sender_si.sin_port);
     
     return nr;
+}
+
+/* Borrowed from the GNU libc manual. */
+int input_timeout(int filedes, unsigned int seconds)
+{
+    fd_set set;
+    struct timeval timeout;
+
+    /* Initialize the file descriptor set. */
+    FD_ZERO(&set);
+    FD_SET(filedes, &set);
+
+    /* Initialize the timeout data structure. */
+    timeout.tv_sec = seconds;
+    timeout.tv_usec = 0;
+
+    /* `select' returns 0 if timeout, 1 if input available, -1 if error. */
+    return TEMP_FAILURE_RETRY(select(FD_SETSIZE,
+                                     &set, NULL, NULL,
+                                     &timeout));
 }
